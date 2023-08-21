@@ -1,7 +1,5 @@
 package main
 
-import "fmt"
-
 type Node struct {
 	V    int
 	Next *Node
@@ -38,12 +36,4 @@ func createTargetArray(nums []int, index []int) []int {
 	}
 
 	return result
-}
-
-func main() {
-	arr := make([]int, 6)
-	arr = []int{1, 2, 3, 4, 5, 0}
-	copy(arr[4:], arr[3:])
-	arr[3] = 10
-	fmt.Println(arr)
 }
