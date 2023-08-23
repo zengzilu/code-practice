@@ -1,6 +1,9 @@
-package _07
+package main
 
-import "math"
+import (
+	"container/heap"
+	"math"
+)
 
 // 为每一个垂直柱子设置一个值 wateredHeight ，表示此位置（x,y）接雨水后的最高值
 // * 这个值有一个特点，预期邻接的柱子最大的 wateredHeight 不会大于 此柱子的 wateredHeight, 整体的雨量 sum (wateredHeight[x][y] - height[x][y])
@@ -16,82 +19,50 @@ import "math"
 //		2.2 如果 a.高度 > s.wateredHeight, 则a一定无水可接，a.wateredHeight = a.height
 // 3. 在探测完a点后，已经计算过wateredHeight所有节点仍然是一个封闭的圈，可以继续在圈边寻找最低点重复#2
 
-var waterSum = 0
-
 func trapRainWater(height [][]int) int {
+	water := 0
+
 	xLen, yLen := len(height), len(height[0])
 	if xLen <= 2 || yLen <= 2 {
 		return 0
 	}
 
-	// 初始化wateredHeight
-	wateredHeight := make([][]int, xLen)
+	// 初始化墙壁
+	wallHeap := &walls{}
+	visited := make([][]bool, xLen)
 	for x := 0; x < xLen; x++ {
-		wateredHeight[x] = make([]int, yLen)
-
+		visited[x] = make([]bool, yLen)
 		for y := 0; y < yLen; y++ {
 			if x == 0 || x == xLen-1 || y == 0 || y == yLen-1 {
-				wateredHeight[x][y] = height[x][y]
+				heap.Push(wallHeap, wall{x, y, height[x][y]})
+				visited[x][y] = true
 			} else {
 				// 还没有被计算过
-				wateredHeight[x][y] = -1
+				visited[x][y] = false
 			}
 		}
 	}
 
-	// 寻找统计水量
-	for visitNextPoint(wateredHeight, height) {
-	}
-	return waterSum
-}
+	// 开始遍历, 只有还有有效的墙壁即循环遍历 => 直到所有的墙壁旁边的墙壁都被visited
+	for wallHeap.Len() > 0 {
+		// 取最矮墙壁
+		shortestWall := heap.Pop(wallHeap).(wall)
 
-func visitNextPoint(wateredHeight [][]int, height [][]int) bool {
-	xLen, yLen := len(wateredHeight), len(wateredHeight[0])
-	minHeight := math.MaxInt
-
-	minX, minY := -1, -1
-	neighboorX, neighboorY := -1, -1
-	for x := 0; x < xLen; x++ {
-		for y := 0; y < yLen; y++ {
-
-			// visited && 小于当前最小值
-			if wateredHeight[x][y] >= 0 && wateredHeight[x][y] < minHeight {
-				// 周围有尚未visited的点
-				px, py := getVisitablePoint(wateredHeight, x, y)
-				if px >= 0 && py >= 0 {
-					// 当前的最矮柱子的邻接点
-					minHeight = min(minHeight, wateredHeight[x][y])
-					minX, minY = px, py
-					neighboorX, neighboorY = x, y
+		// 向4个方向遍历
+		directions := []int{-1, 0, 1, 0, -1}
+		for dirIndex := 0; dirIndex < 4; dirIndex++ {
+			newX, newY := shortestWall.x+directions[dirIndex], shortestWall.y+directions[dirIndex+1]
+			if newX >= 0 && newX < xLen && newY >= 0 && newY < yLen && visited[newX][newY] == false {
+				if height[newX][newY] < shortestWall.z {
+					water += shortestWall.z - height[newX][newY]
 				}
+				heap.Push(wallHeap, wall{newX, newY, max(height[newX][newY], shortestWall.z)})
+				visited[newX][newY] = true
 			}
 		}
 	}
 
-	if minX >= 0 && minY >= 0 {
-		// 选中
-		// wateredHeight[minX][minY] = max(wateredHeight[x][y], height[x][y])
-		if wateredHeight[neighboorX][neighboorY] > height[minX][minY] {
-			waterSum += wateredHeight[neighboorX][neighboorY] - height[minX][minY]
-			wateredHeight[minX][minY] = wateredHeight[neighboorX][neighboorY]
-		} else {
-			wateredHeight[minX][minY] = height[minX][minY]
-		}
-		return true
-	}
-
-	return false
-}
-
-func min(intNums ...int) int {
-	minValue := math.MaxInt
-	for _, num := range intNums {
-		if num < minValue {
-			minValue = num
-		}
-	}
-
-	return minValue
+	return water
 }
 
 func max(intNums ...int) int {
@@ -105,38 +76,17 @@ func max(intNums ...int) int {
 	return maxValue
 }
 
-func getVisitablePoint(wateredHeight [][]int, x, y int) (px, py int) {
-	// 上
-	px, py = x-1, y
-	if isVisitable(wateredHeight, px, py) {
-		return
-	}
-
-	// 下
-	px, py = x+1, y
-	if isVisitable(wateredHeight, px, py) {
-		return
-	}
-
-	// 左
-	px, py = x, y-1
-	if isVisitable(wateredHeight, px, py) {
-		return
-	}
-
-	// 右
-	px, py = x, y+1
-	if isVisitable(wateredHeight, px, py) {
-		return
-	}
-
-	return -1, -1
+type wall struct {
+	x, y, z int
 }
+type walls []wall
 
-func isVisitable(wateredHeight [][]int, x, y int) bool {
-	if x >= 0 && x < len(wateredHeight) && y >= 0 && y < len(wateredHeight[0]) && wateredHeight[x][y] == -1 {
-		return true
-	}
+func (w walls) Len() int { return len(w) }
 
-	return false
-}
+func (w walls) Less(i, j int) bool { return w[i].z < w[j].z }
+
+func (w walls) Swap(i, j int) { w[i], w[j] = w[j], w[i] }
+
+func (w *walls) Push(x interface{}) { *w = append(*w, x.(wall)) }
+
+func (w *walls) Pop() interface{} { r := (*w)[len(*w)-1]; *w = (*w)[:len(*w)-1]; return r }
